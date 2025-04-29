@@ -46,20 +46,20 @@ while True:
         else:
             if int(P_info["PID"]) % 4 == 0:
                 group = 1
-                cb = 1 # context A = light on
-                group_name = "ABA"
+                cb = 1 
+                group_name = "consistent"
             elif int(P_info["PID"]) % 4 == 1:
                 group = 2
                 cb = 1 
-                group_name = "AAA"
+                group_name = "change"
             elif int(P_info["PID"]) % 4 == 2:
                 group = 1
-                cb = 2 # context A = light off
-                group_name = "ABA"
+                cb = 2 
+                group_name = "consistent"
             elif int(P_info["PID"]) % 4 == 3:
                 group = 2
                 cb = 2 
-                group_name = "AAA"
+                group_name = "change"
             
             break  # Exit the loop if the participant ID is valid
     except KeyboardInterrupt:
@@ -68,16 +68,12 @@ while True:
     
 # external equipment connected via parallel ports
 shock_levels = 10
+
 shock_trig = {"high": 1, 
               "low": 11, 
-              "medium": 21} #start on lowest levels
+              "medium": 21} #byte values start on lowest levels
 
 stim_trig = {"TENS": 128, "control": 0} #Pin 8 TENS in AD instrument
-
-if cb == 1:
-    context_trig = {"A": 64, "B": 0, "calibration":0} # Pin 7 light for context A, dark for B
-elif cb == 2:
-    context_trig = {"A": 0, "B": 64, "calibration":0} # counterbalance context A and B
 
 if ports_live == True:
     pport = parallel.ParallelPort(address=0xDFD8) #Get from device Manager
@@ -174,7 +170,7 @@ def termination_check(): #insert throughout experiment so participants can end a
     keys_pressed = event.getKeys(keyList=["escape"])  # Check for "escape" key during countdown
     if "escape" in keys_pressed:
         if ports_live:
-            pport.setData(0) # Set all pins to 0 to shut off context, TENS, shock etc.
+            pport.setData(0) # Set all pins to 0 to shut off TENS, shock etc.
         # Save participant information
 
         save_data(trial_order)
@@ -192,8 +188,8 @@ for i in range(1,shock_levels+1):
         "blocknum": "calibration",
         "stimulus": "control",
         "outcome": "high",
-        "context": "calibration",
         "trialname": "calibration",
+        "trialtype": "calibration",
         "pain_response": None
         } 
     temp_trial_order.append(trial)
@@ -205,39 +201,35 @@ for i in range(1,shock_levels+1):
 trial_order = []
 
 #### 4 x blocks (2 TENS + low shock, 2 control + high shock)
-num_blocks_conditioning = 4
-num_TENS_low = 4
-num_control_high = 4
-
-# 2 probe trials in last 2 blocks
-num_probe_blocks = 2
-num_probe = 1  # per block
+num_blocks_conditioning = 5
+num_TENS = 8
+num_control = 2
 
 # Creating conditioning trials for first blocks without probes
-for i in range(1, num_blocks_conditioning - num_probe_blocks + 1):
+for i in range(1, num_blocks_conditioning + 1):
     temp_trial_order = []
     
-    for j in range(1, num_TENS_low + 1):
+    for j in range(1, num_TENS + 1):
         trial = {
             "phase": "conditioning",
             "blocknum": i,
             "stimulus": "TENS",
-            "outcome": "low",
-            "context": "A",
-            "trialname": "TENS_low",
+            "outcome": None,
+            "trialname": "TENS_choice",
+            "choice": True,
             "exp_response": None,
             "pain_response": None
         }
         temp_trial_order.append(trial)
-    
-    for k in range(1, num_control_high + 1):
+        
+    for k in range(1, num_control + 1):
         trial = {
             "phase": "conditioning",
             "blocknum": i,
             "stimulus": "control",
             "outcome": "high",
-            "context": "A",
-            "trialname": "control_high",
+            "trialname": "control",
+            "choice": None,
             "exp_response": None,
             "pain_response": None
         }
@@ -247,28 +239,14 @@ for i in range(1, num_blocks_conditioning - num_probe_blocks + 1):
     trial_order.extend(temp_trial_order)
 
 # Creating trials for last blocks that include probe trials 
-for i in range(num_blocks_conditioning - num_probe_blocks + 1, num_blocks_conditioning + 1):
+for i in range(num_blocks_conditioning + 1, num_blocks_conditioning + 1):
     temp_trial_order = []
-    for j in range(num_probe):
-        trial = {
-            "phase": "conditioning",
-            "blocknum": i,
-            "stimulus": "TENS",
-            "outcome": "high",
-            "context": "A",
-            "trialname": "probe",
-            "exp_response": None,
-            "pain_response": None
-        }
-        trial_order.append(trial)
-        
     for j in range(1, num_TENS_low + 1):
         trial = {
             "phase": "conditioning",
             "blocknum": i,
             "stimulus": "TENS",
             "outcome": "low",
-            "context": "A",
             "trialname": "TENS_low",
             "exp_response": None,
             "pain_response": None
@@ -281,7 +259,6 @@ for i in range(num_blocks_conditioning - num_probe_blocks + 1, num_blocks_condit
             "blocknum": i,
             "stimulus": "control",
             "outcome": "high",
-            "context": "A",
             "trialname": "control_high",
             "exp_response": None,
             "pain_response": None
@@ -310,10 +287,6 @@ for i in range(1, num_blocks_extinction + 1):
             "exp_response": None,
             "pain_response": None
         }
-        if group == 1:
-            trial["context"] = "B"
-        elif group == 2:
-            trial["context"] = "A"
         temp_trial_order.append(trial)
     
     for k in range(1, num_control_high + 1):
@@ -326,10 +299,6 @@ for i in range(1, num_blocks_extinction + 1):
             "exp_response": None,
             "pain_response": None
         }
-        if group == 1:
-            trial["context"] = "B"
-        elif group == 2:
-            trial["context"] = "A"
 
         temp_trial_order.append(trial)
     
@@ -352,7 +321,6 @@ for i in range(1, num_blocks_renewal + 1):
             "stimulus": "TENS",
             "outcome": "high",
             "trialname": "TENS_high",
-            "context": "A",
             "exp_response": None,
             "pain_response": None
         }
@@ -366,7 +334,6 @@ for i in range(1, num_blocks_renewal + 1):
             "stimulus": "control",
             "outcome": "high",
             "trialname": "control_high",
-            "context": "A",
             "exp_response": None,
             "pain_response": None
         }
@@ -627,7 +594,7 @@ def show_calib_trial(current_trial):
     
 def show_trial(current_trial,trialtype):
     if pport != None:
-        pport.setData(context_trig[current_trial["context"]])
+        pport.setData(0)
         
     win.flip()
         
@@ -648,9 +615,9 @@ def show_trial(current_trial,trialtype):
         if pport != None:
             # turn on TENS pulses if TENS trial, at an on/off interval speed of TENS_pulse_int
             if countdown_timer.getTime() < TENS_timer - TENS_pulse_int:
-                pport.setData(context_trig[current_trial["context"]]+stim_trig[current_trial["stimulus"]])
+                pport.setData(stim_trig[current_trial["stimulus"]])
             if countdown_timer.getTime() < TENS_timer - TENS_pulse_int*2:
-                pport.setData(context_trig[current_trial["context"]])
+                pport.setData(0)
                 TENS_timer = countdown_timer.getTime() 
 
         countdown_text[str(int(math.ceil(countdown_timer.getTime())))].draw()
@@ -665,9 +632,9 @@ def show_trial(current_trial,trialtype):
                       
             # turn on TENS pulses if TENS trial, at an on/off interval speed of TENS_pulse_int
             if countdown_timer.getTime() < TENS_timer - TENS_pulse_int:
-                pport.setData(context_trig[current_trial["context"]]+stim_trig[current_trial["stimulus"]])
+                pport.setData(stim_trig[current_trial["stimulus"]])
             if countdown_timer.getTime() < TENS_timer - TENS_pulse_int*2:
-                pport.setData(context_trig[current_trial["context"]])
+                pport.setData(0)
                 TENS_timer = countdown_timer.getTime() 
 
         countdown_text[str(int(math.ceil(countdown_timer.getTime())))].draw()
@@ -682,14 +649,14 @@ def show_trial(current_trial,trialtype):
         
     # deliver shock
     if pport != None:
-        pport.setData(context_trig[current_trial["context"]])
+        pport.setData(0)
     fix_stim.draw()
     win.flip()
     
     if pport != None:
-        pport.setData(context_trig[current_trial["context"]]+shock_trig[current_trial["outcome"]])
+        pport.setData(shock_trig[current_trial["outcome"]])
         core.wait(port_buffer_duration)
-        pport.setData(context_trig[current_trial["context"]])
+        pport.setData(0)
 
     # Get pain rating
     while pain_rating.getRating() is None: # while mouse unclicked
@@ -743,7 +710,7 @@ while not exp_finish:
     for trial in trial_order:
         show_trial(trial)
 
-    pport.setData(0) # Set all pins to 0 to shut off context, TENS, shock etc.    
+    pport.setData(0) # Set all pins to 0 to shut off TENS, shock etc.    
     # save trial data
     save_data(trial_order)
     exit_screen(instructions_text["end"])
