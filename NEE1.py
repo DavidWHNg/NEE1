@@ -5,7 +5,7 @@ import random
 import csv
 import os
 
-ports_live = True # Set to None if parallel ports not plugged for coding/debugging other parts of exp
+ports_live = None # Set to None if parallel ports not plugged for coding/debugging other parts of exp
 
 ### Experiment details/parameters
 # misc parameters
@@ -13,7 +13,10 @@ port_buffer_duration = 1 #needs about 0.5s buffer for port signal to reset
 iti = 3
 pain_response_duration = float("inf")
 response_hold_duration = 1 # How long the rating screen is left on the response (only used for Pain ratings)
-TENS_pulse_int = 0.1 # interval length for TENS on/off signals (e.g. 0.1 = 0.2s per pulse)
+TENS_pulse_int = {"monomodal": 0.1,
+                  "bimodal": 0.2
+                  }
+# interval length for TENS on/off signals (e.g. 0.1 = 0.2s per pulse)
 
 # within experiment parameters
 P_info = {"PID": ""}
@@ -131,8 +134,6 @@ def instruction_trial(instructions,holdtime):
 # Create functions
     # Save responses to a CSV file
 def save_data(data):
-
-    trial_order.extend(calib_trial_order)
     
     for trial in trial_order:
         trial["PID"] = P_info["PID"]
@@ -186,162 +187,109 @@ for i in range(1,shock_levels+1):
     trial = {
         "phase": "calibration",
         "blocknum": "calibration",
-        "stimulus": "control",
-        "outcome": "high",
-        "trialname": "calibration",
+        "stimulus": None,
+        "outcome1": "high",
+        "outcome2": None,
         "trialtype": "calibration",
         "pain_response": None
         } 
     temp_trial_order.append(trial)
-    
     calib_trial_order.extend(temp_trial_order)
+    
 
 # Setting conditioning trial order
 # Number of trials
 trial_order = []
 
 #### 4 x blocks (2 TENS + low shock, 2 control + high shock)
-num_blocks_conditioning = 5
-num_TENS = 8
-num_control = 2
+num_blocks_conditioning = 10
+num_blocks_extinction = 10
+num_trials_block = {
+        "conditioning": {
+            "TENS": {
+                "num":4,
+                "stimulus": None,
+                "outcome1": "high",
+                "outcome2": "low",
+                "choice": True,
+            },
+            "control": {
+                "num":1,
+                "stimulus": None, 
+                "outcome1": "low",
+                "outcome2": "low",
+                "choice": None,
+            }
+        },
+        "extinction": {
+            "monomodal": {
+                "num":1,
+                "stimulus": "monomodal",
+                "outcome1": "low",
+                "outcome2": None,
+                "choice": None,
+            },
+            "bimodal": {
+                "num":1,
+                "stimulus": "bimodal",
+                "outcome1": "low",
+                "outcome2": None,
+                "choice": None,
+            },
+            "control": {
+                "num":1,
+                "stimulus": None,
+                "outcome1": "low",
+                "outcome2": None,
+                "choice": None,
+            }
+        }
+}
 
-# Creating conditioning trials for first blocks without probes
-for i in range(1, num_blocks_conditioning + 1):
-    temp_trial_order = []
+if group_name == "consistent":
+    rft_schedule_blocks = {
+        "conditioning": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        "extinction": [1] * num_blocks_extinction
+    }
+else:
+    rft_schedule_blocks = {
+        "conditioning": [1, 1, 0.75, 0.75, 0.5, 0.5, 0.25, 0.25, 0, 0],
+        "extinction": [1] * num_blocks_extinction
+    }
     
-    for j in range(1, num_TENS + 1):
-        trial = {
-            "phase": "conditioning",
-            "blocknum": i,
-            "stimulus": "TENS",
-            "outcome": None,
-            "trialname": "TENS_choice",
-            "choice": True,
-            "exp_response": None,
-            "pain_response": None
-        }
-        temp_trial_order.append(trial)
-        
-    for k in range(1, num_control + 1):
-        trial = {
-            "phase": "conditioning",
-            "blocknum": i,
-            "stimulus": "control",
-            "outcome": "high",
-            "trialname": "control",
-            "choice": None,
-            "exp_response": None,
-            "pain_response": None
-        }
-        temp_trial_order.append(trial)
+for phase, trials in num_trials_block.items():
+    if phase == "conditioning":
+        num_blocks = num_blocks_conditioning 
+    else: 
+        num_blocks = num_blocks_extinction
     
-    random.shuffle(temp_trial_order)
-    trial_order.extend(temp_trial_order)
+    for block in range(num_blocks):
+        temp_trial_order = []
 
-# Creating trials for last blocks that include probe trials 
-for i in range(num_blocks_conditioning + 1, num_blocks_conditioning + 1):
-    temp_trial_order = []
-    for j in range(1, num_TENS_low + 1):
-        trial = {
-            "phase": "conditioning",
-            "blocknum": i,
-            "stimulus": "TENS",
-            "outcome": "low",
-            "trialname": "TENS_low",
-            "exp_response": None,
-            "pain_response": None
-        }
-        temp_trial_order.append(trial)
-    
-    for k in range(1, num_control_high + 1):
-        trial = {
-            "phase": "conditioning",
-            "blocknum": i,
-            "stimulus": "control",
-            "outcome": "high",
-            "trialname": "control_high",
-            "exp_response": None,
-            "pain_response": None
-        }
-        temp_trial_order.append(trial)
-    
-    random.shuffle(temp_trial_order)
-    trial_order.extend(temp_trial_order)
+        for trial_type, trial_info in trials.items():
+            for num in range(trial_info["num"]):
+                trial = {
+                    "phase": phase,
+                    "trialtype": trial_type,
+                    "stimulus": trial_info["stimulus"],
+                    "outcome1": trial_info["outcome1"],
+                    "outcome2": trial_info["outcome2"],
+                    "choice": trial_info["choice"],
+                    "rft_schedule": rft_schedule_blocks[phase][block],
+                    "choice_response": None,
+                    "exp_response": None,
+                    "pain_response": None
+                }
+                if phase == "conditioning":
+                    trial["blocknum"] = (block//2) + 1
+                else:
+                    trial["blocknum"] = block
+                    
+                temp_trial_order.append(trial)
 
-# Setting extinction trial order
-# 4 extinction blocks * (2 TENS + high shock, 2 control + high shock)
-num_blocks_extinction = 4
-num_TENS_high = 4
-num_control_high = 4
-
-for i in range(1, num_blocks_extinction + 1):
-    temp_trial_order = []
+        random.shuffle(temp_trial_order)
+        trial_order.extend(temp_trial_order)
     
-    for j in range(1, num_TENS_high + 1):
-        trial = {
-            "phase": "extinction",
-            "blocknum": i,
-            "stimulus": "TENS",
-            "outcome": "high",
-            "trialname": "TENS_high",
-            "exp_response": None,
-            "pain_response": None
-        }
-        temp_trial_order.append(trial)
-    
-    for k in range(1, num_control_high + 1):
-        trial = {
-            "phase": "extinction",
-            "blocknum": i,
-            "stimulus": "control",
-            "outcome": "high",
-            "trialname": "control_high",
-            "exp_response": None,
-            "pain_response": None
-        }
-
-        temp_trial_order.append(trial)
-    
-    random.shuffle(temp_trial_order)
-    trial_order.extend(temp_trial_order)
-    
-# Setting renewal test trial order
-# 2 renewal blocks * (4 TENS + high shock, 4 control + high shock)
-num_blocks_renewal = 2
-num_TENS_high = 4
-num_control_high = 4
-
-for i in range(1, num_blocks_renewal + 1):
-    temp_trial_order = []
-    
-    for j in range(1, num_TENS_high + 1):
-        trial = {
-            "phase": "renewal",
-            "blocknum": i,
-            "stimulus": "TENS",
-            "outcome": "high",
-            "trialname": "TENS_high",
-            "exp_response": None,
-            "pain_response": None
-        }
-        
-        temp_trial_order.append(trial)
-    
-    for k in range(1, num_control_high + 1):
-        trial = {
-            "phase": "renewal",
-            "blocknum": i,
-            "stimulus": "control",
-            "outcome": "high",
-            "trialname": "control_high",
-            "exp_response": None,
-            "pain_response": None
-        }
-        temp_trial_order.append(trial)
-    
-    random.shuffle(temp_trial_order)
-    trial_order.extend(temp_trial_order)
-
 # Assign trial numbers
 for trialnum, trial in enumerate(trial_order, start=1):
     trial["trialnum"] = trialnum
@@ -443,8 +391,9 @@ for i in range(0,11):
                             height = 50,
                             text=str(i))
     
-# Define button_text and calib_buttons dictionaries
+# Define button_text and buttons dictionaries
 button_text = {
+    "calibration": {
     "Next": visual.TextStim(win,
                             text="Try the next shock level",
                             color="white",
@@ -463,11 +412,28 @@ button_text = {
                             color="white",
                             height=25,
                             pos=(-400, -300),
-                            wrapWidth=300)
+                            wrapWidth=300),
+        },
+    "TENS": {
+            "bimodal": visual.TextStim(win,
+                        text="Bimodal",
+                        color="white",
+                        height=25,
+                        pos=(400, -300),
+                        wrapWidth=300
+                        ),            
+    "monomodal": visual.TextStim(win,
+                        text="Monomodal",
+                        color="white",
+                        height=25,
+                        pos=(-400, -300),
+                        wrapWidth=300)
+    }
 }
 
-calib_buttons = {
-    "Next": visual.Rect(win,
+buttons = {
+    "calibration": {
+            "Next": visual.Rect(win,
                         width=300,
                         height=80,
                         fillColor="black",
@@ -484,7 +450,22 @@ calib_buttons = {
                     height=80,
                     fillColor="black",
                     lineColor="white",
-                    pos=(-400, -300))
+                    pos=(-400, -300)),
+    },
+    "TENS": {
+            "bimodal": visual.Rect(win,
+                        width=300,
+                        height=80,
+                        fillColor="black",
+                        lineColor="white",
+                        pos=(400, -300)),  
+    "monomodal": visual.Rect(win,
+                        width=300,
+                        height=80,
+                        fillColor="black",
+                        lineColor="white",
+                        pos=(0, -300)),
+    }
 }
 
 calib_finish = False
@@ -557,11 +538,11 @@ def show_calib_trial(current_trial):
     elif shock_trig["high"] == 10:
         buttons_keylist = ["Previous", "Stay"]
     else:
-        buttons_keylist = calib_buttons.keys()
+        buttons_keylist = buttons["calibration"].keys()
 
     for button_name in buttons_keylist:
-        calib_buttons[button_name].draw()
-        button_text[button_name].draw()
+        buttons["calibration"][button_name].draw()
+        button_text["calibration"][button_name].draw()
 
     win.flip()
     
@@ -571,11 +552,12 @@ def show_calib_trial(current_trial):
     mouse.clickReset()
     
     while trial_finish == False:
-        for button_name, button_rect in calib_buttons.items():
+        for button_name, button_rect in buttons["calibration"].items():
             if mouse.isPressedIn(button_rect):
                 if button_name == "Next":
                     shock_trig["high"] = shock_trig["high"] + 1
                     shock_trig["low"] = shock_trig["low"] + 1
+                    shock_trig["medium"] = shock_trig["medium"] + 1
                     trial_finish = True
                     
                 elif button_name == "Stay":
@@ -585,6 +567,7 @@ def show_calib_trial(current_trial):
                 elif button_name == "Previous":
                     shock_trig["high"] = shock_trig["high"] - 1
                     shock_trig["low"] = shock_trig["low"] - 1
+                    shock_trig["medium"] = shock_trig["medium"] + 1
                     calib_finish = True
                     trial_finish = True
                     
@@ -592,11 +575,35 @@ def show_calib_trial(current_trial):
     
     core.wait(iti)
     
-def show_trial(current_trial,trialtype):
+def show_trial(current_trial):
     if pport != None:
         pport.setData(0)
         
     win.flip()
+    
+    #If TENS trial, ask for choice:
+    
+    if current_trial["choice"] == True:
+        buttons_keylist = buttons["TENS"].keys()
+        for button_name in buttons_keylist:
+            buttons["TENS"][button_name].draw()
+            button_text["TENS"][button_name].draw()
+
+    win.flip()
+
+    choice_finish = False
+    mouse = event.Mouse()
+
+    while choice_finish == False:
+            for button_name, button_rect in buttons["TENS"].items():
+                if mouse.isPressedIn(button_rect):
+                    if button_name == "bimodal":
+                        current_trial["stimulus"] = "bimodal"
+                        current_trial["choice_response"] = "bimodal"
+                    elif button_name == "monomodal":
+                        current_trial["stimulus"] = "monomodal"
+                        current_trial["choice_response"] = "monomodal"
+    
         
     # Start countdown to shock
     
@@ -680,38 +687,32 @@ def show_trial(current_trial,trialtype):
     win.flip()
     
     core.wait(iti)
-    
-# #check values
-# check_values = [trial["trialnum"] for trial in trial_order]
-# print(check_values)
-
-# check_values = [trial["trialname"] for trial in trial_order]
-# print(check_values)
 
 exp_finish = False
+
 
 # Run experiment
 while not exp_finish:
     termination_check()
-    #display welcome and calibration instructions
-    instruction_trial(instructions_text["welcome"],3)
-    instruction_trial(instructions_text["TENS_introduction"],3)
-    instruction_trial(instructions_text["calibration"],8)
+    # #display welcome and calibration instructions
+    # instruction_trial(instructions_text["welcome"],3)
+    # instruction_trial(instructions_text["TENS_introduction"],3)
+    # instruction_trial(instructions_text["calibration"],8)
     
-    for trial in calib_trial_order:
-        show_calib_trial(trial)
-        if calib_finish == True:
-            break
+    # for trial in calib_trial_order:
+    #     show_calib_trial(trial)
+    #     if calib_finish == True:
+    #         break
     
-    instruction_trial(instructions_text["calibration_finish"],3)
+    # instruction_trial(instructions_text["calibration_finish"],3)
     
-    # #display main experiment phase
-    instruction_trial(instructions_text["experiment"],10)
-    for trial in trial_order:
-        show_trial(trial)
+    # # #display main experiment phase
+    # instruction_trial(instructions_text["experiment"],10)
+    # for trial in trial_order:
+    #     show_trial(trial)
 
-    pport.setData(0) # Set all pins to 0 to shut off TENS, shock etc.    
-    # save trial data
+    # pport.setData(0) # Set all pins to 0 to shut off TENS, shock etc.    
+    # # save trial data
     save_data(trial_order)
     exit_screen(instructions_text["end"])
     
