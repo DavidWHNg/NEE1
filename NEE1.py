@@ -1,5 +1,6 @@
 # Import packages
 from psychopy import core, event, gui, visual, parallel, prefs
+import time
 import math
 import random
 import csv
@@ -13,9 +14,9 @@ port_buffer_duration = 1 #needs about 0.5s buffer for port signal to reset
 iti = 3
 pain_response_duration = float("inf")
 response_hold_duration = 1 # How long the rating screen is left on the response (only used for Pain ratings)
-TENS_pulse_int = {"monomodal": 0.1,
-                  "bimodal": 0.2
-                  }
+TENS_pulse_int = 0.1
+TENS_names = ("monopolar","bipolar")
+
 # interval length for TENS on/off signals (e.g. 0.1 = 0.2s per pulse)
 
 # within experiment parameters
@@ -68,6 +69,13 @@ while True:
     except KeyboardInterrupt:
         print("Participant info input canceled.")
         break  # Exit the loop if the participant info input is canceled
+
+    # get date and time of experiment start
+datetime = time.strftime("%Y-%m-%d_%H.%M.%S")
+
+TENS_outcomes = {"suboptimal": TENS_names[cb-2],
+                 "optimal" : TENS_names[cb-1]
+}
     
 # external equipment connected via parallel ports
 shock_levels = 10
@@ -111,7 +119,7 @@ def instruction_trial(instructions,holdtime):
                     wrapWidth= 960
                     ).draw()
     win.flip()
-    core.wait(holdtime)
+    wait(holdtime)
     visual.TextStim(win,
                     text = instructions,
                     height = 35,
@@ -129,19 +137,22 @@ def instruction_trial(instructions,holdtime):
     event.waitKeys(keyList=["space"])
     win.flip()
     
-    core.wait(iti)
+    wait(iti)
     
 # Create functions
     # Save responses to a CSV file
 def save_data(data):
     
     for trial in trial_order:
+        trial['datetime'] = datetime
         trial["PID"] = P_info["PID"]
         trial["group"] = group
         trial["group_name"] = group_name
         trial["cb"] = cb
-        trial["shock_level"] = shock_trig["high"]
+        trial["optimalTENS"] = TENS_outcomes["optimal"]
+        trial["shock_level_high"] = shock_trig["high"]
 
+    trial_order.extend(calib_trial_order)
     # Extract column names from the keys in the first trial dictionary
     colnames = list(trial_order[0].keys())
 
@@ -178,6 +189,21 @@ def termination_check(): #insert throughout experiment so participants can end a
         exit_screen(instructions_text["termination"])
         core.quit()
 
+#define waiting function so experiment doesn't freeze as it does with core.wait()
+
+def wait(time):
+    countdown_timer = core.CountdownTimer(time)
+    while countdown_timer.getTime() > 0:
+        termination_check()
+        
+#define choice function for TENS trials
+
+def outcome_randomise(outcome1,outcome2,rft_schedule):
+    return random.choices(
+        [outcome1,outcome2],
+        weights = [rft_schedule,1-rft_schedule],
+    k=1
+    )[0]
 
 # Define trials
 # Calibration trials
@@ -188,8 +214,10 @@ for i in range(1,shock_levels+1):
         "phase": "calibration",
         "blocknum": "calibration",
         "stimulus": None,
-        "outcome1": "high",
-        "outcome2": None,
+        "choicetrial": False,
+        "choice1": None,
+        "choice2": None,
+        "outcome" : "high",
         "trialtype": "calibration",
         "pain_response": None
         } 
@@ -208,40 +236,45 @@ num_trials_block = {
         "conditioning": {
             "TENS": {
                 "num":4,
-                "stimulus": None,
-                "outcome1": "high",
-                "outcome2": "low",
-                "choice": True,
+                "stimulus": "TENS",
+                "choicetrial": True,
+                "choice1": TENS_outcomes["optimal"],
+                "choice2": TENS_outcomes["suboptimal"],
+                "outcome": None,
             },
             "control": {
                 "num":1,
                 "stimulus": None, 
-                "outcome1": "low",
-                "outcome2": "low",
-                "choice": None,
+                "choicetrial": False,
+                "choice1": None,
+                "choice2": None,
+                "outcome": "low",
             }
         },
         "extinction": {
-            "monomodal": {
+            "monopolar": {
                 "num":1,
-                "stimulus": "monomodal",
-                "outcome1": "low",
-                "outcome2": None,
-                "choice": None,
+                "stimulus": "TENS",
+                "choicetrial": False,
+                "choice1": None,
+                "choice2": None,
+                "outcome": "low",
             },
-            "bimodal": {
+            "bipolar": {
                 "num":1,
-                "stimulus": "bimodal",
-                "outcome1": "low",
-                "outcome2": None,
-                "choice": None,
+                "stimulus": "TENS",
+                "choicetrial": False,
+                "choice1": None,
+                "choice2": None,
+                "outcome": "low",
             },
             "control": {
                 "num":1,
                 "stimulus": None,
-                "outcome1": "low",
-                "outcome2": None,
-                "choice": None,
+                "choicetrial": False,
+                "choice1": None,
+                "choice2": None,
+                "outcome": "low",
             }
         }
 }
@@ -272,10 +305,11 @@ for phase, trials in num_trials_block.items():
                     "phase": phase,
                     "trialtype": trial_type,
                     "stimulus": trial_info["stimulus"],
-                    "outcome1": trial_info["outcome1"],
-                    "outcome2": trial_info["outcome2"],
-                    "choice": trial_info["choice"],
+                    "choice1": trial_info["choice1"],
+                    "choice2": trial_info["choice2"],
+                    "choicetrial": trial_info["choicetrial"],
                     "rft_schedule": rft_schedule_blocks[phase][block],
+                    "outcome": trial_info["outcome"],
                     "choice_response": None,
                     "exp_response": None,
                     "pain_response": None
@@ -343,8 +377,8 @@ exp_rating = rating_stim["Expectancy"]
 # text stimuli
 instructions_text = {
     "welcome": "Welcome to the experiment! Please read the following instructions carefully.", 
-    "TENS_introduction": "This experiment aims to investigate the effects of Transcutaneous Electrical Nerve Stimulation (TENS) on pain sensitivity. TENS may be able to decrease pain sensitivity by blocking the pain signals that travel up your arm and into your brain.\n\n\
-        The TENS itself is not painful, but you will feel a small sensation when it is turned on",
+    "TENS_introduction": "This experiment aims to investigate the effects of Transcutaneous Electrical Nerve Stimulation (TENS) on pain sensitivity. Different amplitudes of TENS may be able to increase pain sensitivity by blocking the pain signals that travel up your arm and into your brain.\n\n\
+        The TENS itself is not painful, but you will feel a small sensation when it is turned on. Today we are testing the effects of monopolar and bipolar amplitudes.",
     "calibration" : "Firstly, we are going to calibrate the pain intensity for the shocks you will receive in the experiment without TENS. As this is a study about pain, we want you to feel a moderate bit of pain, but nothing unbearable. \
 The machine will start low, and then will gradually work up. We want to get to a level which is painful but tolerable, so roughly at a rating of around 7 out of 10, where 1 is not painful and 10 is very painful.\n\n\
 After each shock you will be asked if that level was ok, and you will be given the option to either try the next level or set the current shock level for the experiment. You can always come back down if it becomes too uncomfortable!\n\n\
@@ -353,7 +387,8 @@ Please ask the experimenter if you have any questions at anytime",
     "experiment" : "We can now begin the experiment. \n\n\
 You will now receive a series of electrical shocks and your task is to rate the intensity of the pain caused by each shock on a rating scale. \
 This rating scale ranges from NOT PAINFUL to VERY PAINFUL. \n\n\
-All shocks will be signaled by a 10 second countdown. The shock will occur when an X appears, similarly as in the calibration procedure. The TENS will now also be active on some trials. \
+All shocks will be signaled by a 10 second countdown. The shock will occur when an X appears, similarly as in the calibration procedure. \
+On TENS trials, you will be given the choice between receiving monopolar and bipolar amplitudes of TENS. Please use your mouse to select your choice\
 As you are waiting for the shock during the countdown, you will also be asked to rate how painful you expect the following shock to be. After each trial there will be a brief interval to allow you to rest between shocks. The task should take roughly 10 minutes. \n\n\
 Please ask the experimenter if you have any questions now before proceeding.",
     "continue" : "\n\nPress spacebar to continue",
@@ -369,7 +404,8 @@ response_instructions = {
     "Shock": "Press spacebar to activate the shock",
     "Check": "Please indicate whether you would like to try the next level of shock, stay at this level, or go back to the previous level for the experiment.",
     "Check_max": "Note that this is the maximum level of shock.\n\n\
- Would you like to stay at this level or go down a level?"
+ Would you like to stay at this level or go down a level?",
+    "Choice": "Please choose which amplitude of TENS you want to receive on this trial."
                          }
 
 pain_text = visual.TextStim(win,
@@ -415,15 +451,15 @@ button_text = {
                             wrapWidth=300),
         },
     "TENS": {
-            "bimodal": visual.TextStim(win,
-                        text="Bimodal",
+            "bipolar": visual.TextStim(win,
+                        text="Bipolar",
                         color="white",
                         height=25,
                         pos=(400, -300),
                         wrapWidth=300
                         ),            
-    "monomodal": visual.TextStim(win,
-                        text="Monomodal",
+    "monopolar": visual.TextStim(win,
+                        text="Monopolar",
                         color="white",
                         height=25,
                         pos=(-400, -300),
@@ -439,32 +475,32 @@ buttons = {
                         fillColor="black",
                         lineColor="white",
                         pos=(400, -300)),
-    "Stay": visual.Rect(win,
-                        width=300,
-                        height=80,
-                        fillColor="black",
-                        lineColor="white",
-                        pos=(0, -300)),
-    "Previous": visual.Rect(win,
+            "Stay": visual.Rect(win,
+                                width=300,
+                                height=80,
+                                fillColor="black",
+                                lineColor="white",
+                                pos=(0, -300)),
+            "Previous": visual.Rect(win,
+                            width=300,
+                            height=80,
+                            fillColor="black",
+                            lineColor="white",
+                            pos=(-400, -300)),
+    },
+    "TENS": {
+        "bipolar": visual.Rect(win,
                     width=300,
                     height=80,
                     fillColor="black",
                     lineColor="white",
-                    pos=(-400, -300)),
-    },
-    "TENS": {
-            "bimodal": visual.Rect(win,
-                        width=300,
-                        height=80,
-                        fillColor="black",
-                        lineColor="white",
-                        pos=(400, -300)),  
-    "monomodal": visual.Rect(win,
-                        width=300,
-                        height=80,
-                        fillColor="black",
-                        lineColor="white",
-                        pos=(0, -300)),
+                    pos=(400, -300)),  
+        "monopolar": visual.Rect(win,
+                            width=300,
+                            height=80,
+                            fillColor="black",
+                            lineColor="white",
+                            pos=(-400, -300)),
     }
 }
 
@@ -495,7 +531,7 @@ def show_calib_trial(current_trial):
     
     if pport != None:
         pport.setData(shock_trig["high"])
-        core.wait(port_buffer_duration)
+        wait(port_buffer_duration)
         pport.setData(0)
     
     # Get pain rating
@@ -517,7 +553,7 @@ def show_calib_trial(current_trial):
     calib_rating.reset()
     
     win.flip()
-    core.wait(iti)
+    wait(iti)
     
     if shock_trig["high"] < 10:
         visual.TextStim(win,
@@ -573,7 +609,7 @@ def show_calib_trial(current_trial):
                     
     win.flip()
     
-    core.wait(iti)
+    wait(iti)
     
 def show_trial(current_trial):
     if pport != None:
@@ -583,26 +619,38 @@ def show_trial(current_trial):
     
     #If TENS trial, ask for choice:
     
-    if current_trial["choice"] == True:
+    if current_trial["choicetrial"] == True:
         buttons_keylist = buttons["TENS"].keys()
         for button_name in buttons_keylist:
             buttons["TENS"][button_name].draw()
             button_text["TENS"][button_name].draw()
+        visual.TextStim(win,
+                text=response_instructions["Choice"],
+                height = 35,
+                pos = (0,0),
+                ).draw()
+        
+        win.flip()
 
-    win.flip()
+        choice_finish = False
+        mouse = event.Mouse()
 
-    choice_finish = False
-    mouse = event.Mouse()
-
-    while choice_finish == False:
-            for button_name, button_rect in buttons["TENS"].items():
-                if mouse.isPressedIn(button_rect):
-                    if button_name == "bimodal":
-                        current_trial["stimulus"] = "bimodal"
-                        current_trial["choice_response"] = "bimodal"
-                    elif button_name == "monomodal":
-                        current_trial["stimulus"] = "monomodal"
-                        current_trial["choice_response"] = "monomodal"
+        while choice_finish == False:
+                for button_name, button_rect in buttons["TENS"].items():
+                    if mouse.isPressedIn(button_rect):
+                        if button_name == TENS_outcomes["optimal"]:
+                            current_trial["stimulus"] = "TENS"
+                            current_trial["choice_response"] = TENS_outcomes["optimal"]
+                            current_trial["outcome"] = "medium"
+                            choice_finish = True
+                        elif button_name == TENS_outcomes["suboptimal"]:
+                            current_trial["stimulus"] = "TENS"
+                            current_trial["choice_response"] = TENS_outcomes["suboptimal"]
+                            current_trial["outcome"] = outcome_randomise(
+                                "high",
+                                "low",
+                                current_trial["rft_schedule"])
+                            choice_finish = True
     
         
     # Start countdown to shock
@@ -662,7 +710,10 @@ def show_trial(current_trial):
     
     if pport != None:
         pport.setData(shock_trig[current_trial["outcome"]])
-        core.wait(port_buffer_duration)
+        
+    wait(port_buffer_duration)
+
+    if pport != None:
         pport.setData(0)
 
     # Get pain rating
@@ -686,7 +737,7 @@ def show_trial(current_trial):
 
     win.flip()
     
-    core.wait(iti)
+    wait(iti)
 
 exp_finish = False
 
@@ -695,23 +746,23 @@ exp_finish = False
 while not exp_finish:
     termination_check()
     # #display welcome and calibration instructions
-    # instruction_trial(instructions_text["welcome"],3)
-    # instruction_trial(instructions_text["TENS_introduction"],3)
-    # instruction_trial(instructions_text["calibration"],8)
+    instruction_trial(instructions_text["welcome"],3)
+    instruction_trial(instructions_text["TENS_introduction"],3)
+    instruction_trial(instructions_text["calibration"],8)
     
-    # for trial in calib_trial_order:
-    #     show_calib_trial(trial)
-    #     if calib_finish == True:
-    #         break
+    for trial in calib_trial_order:
+        show_calib_trial(trial)
+        if calib_finish == True:
+            break
     
-    # instruction_trial(instructions_text["calibration_finish"],3)
+    instruction_trial(instructions_text["calibration_finish"],3)
     
     # # #display main experiment phase
-    # instruction_trial(instructions_text["experiment"],10)
-    # for trial in trial_order:
-    #     show_trial(trial)
+    instruction_trial(instructions_text["experiment"],10)
+    for trial in trial_order:
+        show_trial(trial)
 
-    # pport.setData(0) # Set all pins to 0 to shut off TENS, shock etc.    
+    pport.setData(0) # Set all pins to 0 to shut off TENS, shock etc.    
     # # save trial data
     save_data(trial_order)
     exit_screen(instructions_text["end"])
