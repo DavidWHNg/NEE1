@@ -108,6 +108,13 @@ fix_stim = visual.TextStim(win,
                             height = 50,
                             font = "Roboto Mono Medium")
 
+
+#define waiting function so experiment doesn't freeze as it does with core.wait()
+def wait(time):
+    countdown_timer = core.CountdownTimer(time)
+    while countdown_timer.getTime() > 0:
+        termination_check()
+        
 #create instruction trials
 def instruction_trial(instructions,holdtime): 
     termination_check()
@@ -188,13 +195,6 @@ def termination_check(): #insert throughout experiment so participants can end a
         save_data(trial_order)
         exit_screen(instructions_text["termination"])
         core.quit()
-
-#define waiting function so experiment doesn't freeze as it does with core.wait()
-
-def wait(time):
-    countdown_timer = core.CountdownTimer(time)
-    while countdown_timer.getTime() > 0:
-        termination_check()
         
 #define choice function for TENS trials
 
