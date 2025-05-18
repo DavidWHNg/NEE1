@@ -14,7 +14,15 @@ port_buffer_duration = 1 #needs about 0.5s buffer for port signal to reset
 iti = 3
 pain_response_duration = float("inf")
 response_hold_duration = 1 # How long the rating screen is left on the response (only used for Pain ratings)
-TENS_pulse_int = 0.1
+TENS_pulse_pattern_list = {"pause": [(0.0, 1), (0.1, 0), # 3 rapid pulses followed by pause, first number specifies time in seconds, second number port send value
+                                 (0.2, 1), (0.3, 0),
+                                 (0.4, 1), (0.5, 0)],
+                       "constant": [(0.0, 1), (0.10, 0),
+                                (0.333, 1), (0.433, 0),
+                                (0.666, 1), (0.766, 0)] # constant equally spaced pulses 
+}
+timer_precision_range = 0.01 # pulses should be accurate to within 10 milliseconds
+
 TENS_names = ("monopolar","bipolar")
 
 # interval length for TENS on/off signals (e.g. 0.1 = 0.2s per pulse)
@@ -48,22 +56,16 @@ while True:
             print(f"Data for participant {P_info['PID']} already exists. Choose a different participant ID.") ### to avoid re-writing existing data
             
         else:
-            if int(P_info["PID"]) % 4 == 0:
+            cb = int(P_info["PID"]) % 4
+
+            if cb in [0, 2]:
                 group = 1
-                cb = 1 
                 group_name = "consistent"
-            elif int(P_info["PID"]) % 4 == 1:
+            else:
                 group = 2
-                cb = 1 
                 group_name = "change"
-            elif int(P_info["PID"]) % 4 == 2:
-                group = 1
-                cb = 2 
-                group_name = "consistent"
-            elif int(P_info["PID"]) % 4 == 3:
-                group = 2
-                cb = 2 
-                group_name = "change"
+
+            cb = int(P_info["PID"]) % 4
             
             break  # Exit the loop if the participant ID is valid
     except KeyboardInterrupt:
@@ -73,9 +75,30 @@ while True:
     # get date and time of experiment start
 datetime = time.strftime("%Y-%m-%d_%H.%M.%S")
 
-TENS_outcomes = {"suboptimal": TENS_names[cb-2],
-                 "optimal" : TENS_names[cb-1]
+TENS_outcomes = {"suboptimal": TENS_names[cb%2],
+                 "optimal" : TENS_names[(cb+1)%2]
 }
+
+if (cb // 2) % 2 == 0:
+    TENS_pulse_patterns = {
+        "optimal": TENS_pulse_pattern_list["pause"],
+        "suboptimal": TENS_pulse_pattern_list["constant"]
+    }
+    TENS_pulse_patterns_names = {
+        "optimal": "pause",
+        "suboptimal": "constant"
+        }
+else:
+    TENS_pulse_patterns = {
+        "optimal": TENS_pulse_pattern_list["constant"],
+        "suboptimal": TENS_pulse_pattern_list["pause"]
+    }
+
+    TENS_pulse_patterns_names = {
+        "optimal": "constant",
+        "suboptimal": "pause"
+        }
+
     
 # external equipment connected via parallel ports
 shock_levels = 10
@@ -156,8 +179,10 @@ def save_data(data):
         trial["group"] = group
         trial["group_name"] = group_name
         trial["cb"] = cb
-        trial["optimalTENS"] = TENS_outcomes["optimal"]
+        trial["optimalTENS_name"] = TENS_outcomes["optimal"]
+        trial["optimalTENS_pattern"] = TENS_pulse_patterns_names["optimal"]
         trial["shock_level_high"] = shock_trig["high"]
+
 
     trial_order.extend(calib_trial_order)
     # Extract column names from the keys in the first trial dictionary
@@ -610,7 +635,7 @@ def show_calib_trial(current_trial):
     win.flip()
     
     wait(iti)
-    
+
 def show_trial(current_trial):
     if pport != None:
         pport.setData(0)
@@ -662,35 +687,23 @@ def show_trial(current_trial):
         termination_check()
         countdown_text[str(int(math.ceil(countdown_timer.getTime())))].draw()
         win.flip()
-    
-        TENS_timer = countdown_timer.getTime() + TENS_pulse_int
+        
     while countdown_timer.getTime() < 8 and countdown_timer.getTime() > 7: #turn on TENS at 8 seconds
         termination_check()
-        
         if pport != None:
-            # turn on TENS pulses if TENS trial, at an on/off interval speed of TENS_pulse_int
-            if countdown_timer.getTime() < TENS_timer - TENS_pulse_int:
-                pport.setData(stim_trig[current_trial["stimulus"]])
-            if countdown_timer.getTime() < TENS_timer - TENS_pulse_int*2:
-                pport.setData(0)
-                TENS_timer = countdown_timer.getTime() 
-
+            termination_check()
+            for time, port in TENS_pulse_patterns[current_trial["choice_response"]]:
+                if abs(countdown_timer - math.floor(countdown_timer) - time) < timer_precision_range:
+                    pport.setData(port)
         countdown_text[str(int(math.ceil(countdown_timer.getTime())))].draw()
         win.flip()
-
-    
-    TENS_timer = countdown_timer.getTime() + TENS_pulse_int
 
     while countdown_timer.getTime() < 7 and countdown_timer.getTime() > 0: #ask for expectancy at 7 seconds
         if pport != None:
             termination_check()
-                      
-            # turn on TENS pulses if TENS trial, at an on/off interval speed of TENS_pulse_int
-            if countdown_timer.getTime() < TENS_timer - TENS_pulse_int:
-                pport.setData(stim_trig[current_trial["stimulus"]])
-            if countdown_timer.getTime() < TENS_timer - TENS_pulse_int*2:
-                pport.setData(0)
-                TENS_timer = countdown_timer.getTime() 
+            for time, port in TENS_pulse_patterns[current_trial["choice_response"]]:
+                if abs(countdown_timer - math.floor(countdown_timer) - time) < timer_precision_range:
+                    pport.setData(port)
 
         countdown_text[str(int(math.ceil(countdown_timer.getTime())))].draw()
         
