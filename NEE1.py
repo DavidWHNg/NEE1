@@ -80,26 +80,28 @@ TENS_outcomes = {"suboptimal": TENS_names[cb%2],
 }
 
 if (cb // 2) % 2 == 0:
-    TENS_pulse_patterns = {
-        "optimal": TENS_pulse_pattern_list["pause"],
-        "suboptimal": TENS_pulse_pattern_list["constant"]
-    }
-    TENS_pulse_patterns_names = {
-        "optimal": "pause",
-        "suboptimal": "constant"
-        }
+    TENS1_name = TENS_outcomes["suboptimal"]
+    TENS2_name = TENS_outcomes["optimal"]
+    TENS1_type = "suboptimal"
+    TENS2_type = "optimal"
 else:
-    TENS_pulse_patterns = {
-        "optimal": TENS_pulse_pattern_list["constant"],
-        "suboptimal": TENS_pulse_pattern_list["pause"]
-    }
+    TENS1_name = TENS_outcomes["optimal"]
+    TENS2_name = TENS_outcomes["suboptimal"]
+    TENS1_type = "optimal"
+    TENS2_type = "suboptimal"
 
-    TENS_pulse_patterns_names = {
-        "optimal": "constant",
-        "suboptimal": "pause"
-        }
+# Assign pulse pattern lists
+TENS_pulse_patterns = {
+    TENS1_name: TENS_pulse_pattern_list["pause"],
+    TENS2_name: TENS_pulse_pattern_list["constant"]
+}
 
-    
+# Store pulse pattern names for saving
+TENS_pulse_patterns_names = {
+    TENS1_type: "pause",
+    TENS2_type: "constant"
+}
+
 # external equipment connected via parallel ports
 shock_levels = 10
 
@@ -402,18 +404,18 @@ exp_rating = rating_stim["Expectancy"]
 # text stimuli
 instructions_text = {
     "welcome": "Welcome to the experiment! Please read the following instructions carefully.", 
-    "TENS_introduction": "This experiment aims to investigate the effects of Transcutaneous Electrical Nerve Stimulation (TENS) on pain sensitivity. Different amplitudes of TENS may be able to increase pain sensitivity by blocking the pain signals that travel up your arm and into your brain.\n\n\
-        The TENS itself is not painful, but you will feel a small sensation when it is turned on. Today we are testing the effects of monopolar and bipolar amplitudes.",
+    "TENS_introduction": "This experiment aims to investigate the effects of Transcutaneous Electrical Nerve Stimulation (TENS) on pain sensitivity. Different frequencies of TENS may be able to increase pain sensitivity by blocking the pain signals that travel up your arm and into your brain.\n\n\
+        The TENS itself is not painful, but you will feel a small sensation when it is turned on. Today we are testing the effects of monopolar and bipolar frequencies.",
     "calibration" : "Firstly, we are going to calibrate the pain intensity for the shocks you will receive in the experiment without TENS. As this is a study about pain, we want you to feel a moderate bit of pain, but nothing unbearable. \
 The machine will start low, and then will gradually work up. We want to get to a level which is painful but tolerable, so roughly at a rating of around 7 out of 10, where 1 is not painful and 10 is very painful.\n\n\
 After each shock you will be asked if that level was ok, and you will be given the option to either try the next level or set the current shock level for the experiment. You can always come back down if it becomes too uncomfortable!\n\n\
-Please ask the experimenter if you have any questions at anytime",
+Please ask the experimenter if you have any questions at anytime.",
     "calibration_finish": "Thank you for completing the calibration, your maximum shock intensity has now been set.",
     "experiment" : "We can now begin the experiment. \n\n\
 You will now receive a series of electrical shocks and your task is to rate the intensity of the pain caused by each shock on a rating scale. \
 This rating scale ranges from NOT PAINFUL to VERY PAINFUL. \n\n\
 All shocks will be signaled by a 10 second countdown. The shock will occur when an X appears, similarly as in the calibration procedure. \
-On TENS trials, you will be given the choice between receiving monopolar and bipolar amplitudes of TENS. Please use your mouse to select your choice\
+On TENS trials, you will be given the choice between receiving monopolar and bipolar frequencies of TENS. Please use your mouse to select your choice\
 As you are waiting for the shock during the countdown, you will also be asked to rate how painful you expect the following shock to be. After each trial there will be a brief interval to allow you to rest between shocks. The task should take roughly 10 minutes. \n\n\
 Please ask the experimenter if you have any questions now before proceeding.",
     "continue" : "\n\nPress spacebar to continue",
@@ -427,7 +429,9 @@ response_instructions = {
     "Pain": "How painful was the shock?",
     "Expectancy": "How painful do you expect the next shock to be?",
     "Shock": "Press spacebar to activate the shock",
+    "Shock_check": "Would you like to try the previous level of shock again?",
     "Check": "Please indicate whether you would like to try the next level of shock, stay at this level, or go back to the previous level for the experiment.",
+    "Check_lvl1": "Please indicate whether you would like to try the next level of shock or stay at this level",
     "Check_max": "Note that this is the maximum level of shock.\n\n\
  Would you like to stay at this level or go down a level?",
     "Choice": "Please choose which amplitude of TENS you want to receive on this trial."
@@ -476,20 +480,36 @@ button_text = {
                             wrapWidth=300),
         },
     "TENS": {
-            "bipolar": visual.TextStim(win,
-                        text="Bipolar",
-                        color="white",
-                        height=25,
-                        pos=(400, -300),
-                        wrapWidth=300
-                        ),            
-    "monopolar": visual.TextStim(win,
-                        text="Monopolar",
+        TENS1_name: visual.TextStim(win,
+                    text=TENS1_name,
+                    color="white",
+                    height=25,
+                    pos=(400, -300),
+                    wrapWidth=300   
+                    ),            
+        TENS2_name: visual.TextStim(win,
+                            text=TENS2_name,
+                            color="white",
+                            height=25,
+                            pos=(-400, -300),
+                            wrapWidth=300)
+    },
+    "confirm": {    
+        "Yes": visual.TextStim(win,
+                    text="Yes",
+                    color="white",
+                    height=25,
+                    pos=(400, -300),
+                    wrapWidth=300   
+                    ),     
+        "No": visual.TextStim(win,
+                        text="No",
                         color="white",
                         height=25,
                         pos=(-400, -300),
-                        wrapWidth=300)
+                        wrapWidth=300) 
     }
+
 }
 
 buttons = {
@@ -526,115 +546,161 @@ buttons = {
                             fillColor="black",
                             lineColor="white",
                             pos=(-400, -300)),
-    }
+    },
+    "confirm": {
+                "Yes": visual.Rect(win,
+                        width=300,
+                        height=80,
+                        fillColor="black",
+                        lineColor="white",
+                        pos=(400, -300)), 
+        "No": visual.Rect(win,
+                        width=300,
+                        height=80,
+                        fillColor="black",
+                        lineColor="white",
+                        pos=(-400, -300)),
+        }
+
 }
 
 calib_finish = False
 
 #### Make trial functions
     # calibration trials
-def show_calib_trial(current_trial):
+def show_calib_trial(trial_order):
+    trial_index = 0
     global calib_finish
+    previous_trial = False
     termination_check()
-    # Wait for participant to ready up for shock
-    visual.TextStim(win,
-        text=response_instructions["Shock"],
-        height = 35,
-        pos = (0,0),
-        wrapWidth= 800
-        ).draw()
-    
-    win.flip()
-    event.waitKeys(keyList = ["space"])
-    
-    # show fixation stimulus + deliver shock
-    if pport != None:
-        pport.setData(0)
 
-    fix_stim.draw()
-    win.flip()
-    
-    if pport != None:
-        pport.setData(shock_trig["high"])
-        wait(port_buffer_duration)
-        pport.setData(0)
-    
-    # Get pain rating
-    while calib_rating.getRating() is None: # while mouse unclicked
-        termination_check()
-        pain_text.draw()
-        calib_rating.draw()
-        win.flip()
-         
-    pain_response_end_time = core.getTime() + response_hold_duration # amount of time for participants to adjust slider after making a response
-    
-    while core.getTime() < pain_response_end_time:
-        termination_check()
-        pain_text.draw()
-        calib_rating.draw()
-        win.flip()
-
-    current_trial["pain_response"] = calib_rating.getRating()
-    calib_rating.reset()
-    
-    win.flip()
-    wait(iti)
-    
-    if shock_trig["high"] < 10:
+    while 0 <= trial_index < len(calib_trial_order) and not calib_finish:
+        current_trial = trial_order[trial_index]
+        if previous_trial == True:
+            visual.TextStim(win,
+                text=response_instructions["Shock_check"],
+                height = 35,
+                pos = (0,0),
+                wrapWidth= 800
+                ).draw()
+            buttons_keylist = ["Yes", "No"]
+            for button_name in buttons_keylist:
+                buttons["confirm"][button_name].draw()
+                button_text["confirm"][button_name].draw()
+            mouse = event.Mouse()
+            mouse.clickReset()
+            win.flip()
+            
+            choice_finish = False
+            while choice_finish == False:
+                for button_name in buttons_keylist:
+                        if mouse.isPressedIn(buttons["confirm"][button_name]):
+                            if button_name == "Yes":
+                                choice_finish = True
+                                previous_trial = False
+                                wait(iti)
+                                break
+                            elif button_name == "No":
+                                choice_finish = True
+                                calib_finish = True
+                                wait(iti)
+                                return
+            
+        # Wait for participant to ready up for shock
         visual.TextStim(win,
-                text=response_instructions["Check"],
-                height = 35,
-                pos = (0,0),
-                ).draw()
-    elif shock_trig["high"] == 10:
-                visual.TextStim(win,
-                text=response_instructions["Check_max"],
-                height = 35,
-                pos = (0,0),
-                ).draw()
+            text=response_instructions["Shock"],
+            height = 35,
+            pos = (0,0),
+            wrapWidth= 800
+            ).draw()
+        
+        win.flip()
+        event.waitKeys(keyList = ["space"])
+        
+        # show fixation stimulus + deliver shock
+        if pport != None:
+            pport.setData(0)
 
-    # Draw buttons and text
-    if shock_trig["high"] == 1:
-        buttons_keylist = ["Next", "Stay"]
-    elif shock_trig["high"] == 10:
-        buttons_keylist = ["Previous", "Stay"]
-    else:
-        buttons_keylist = buttons["calibration"].keys()
+        fix_stim.draw()
+        win.flip()
+        
+        if pport != None:
+            pport.setData(shock_trig["high"])
+            wait(port_buffer_duration)
+            pport.setData(0)
+        
+        # Get pain rating
+        while calib_rating.getRating() is None: # while mouse unclicked
+            termination_check()
+            pain_text.draw()
+            calib_rating.draw()
+            win.flip()
+            
+        pain_response_end_time = core.getTime() + response_hold_duration # amount of time for participants to adjust slider after making a response
+        
+        while core.getTime() < pain_response_end_time:
+            termination_check()
+            pain_text.draw()
+            calib_rating.draw()
+            win.flip()
 
-    for button_name in buttons_keylist:
-        buttons["calibration"][button_name].draw()
-        button_text["calibration"][button_name].draw()
+        current_trial["pain_response"] = calib_rating.getRating()
+        calib_rating.reset()
+        win.flip()
+        wait(iti)
 
-    win.flip()
+        # Feedback text
+        if shock_trig["high"] == 1:
+            text = response_instructions["Check_lvl1"]
+        elif shock_trig["high"] < 10:
+            text = response_instructions["Check"]
+        else:
+            text = response_instructions["Check_max"]
+
+        visual.TextStim(win, text=text, height=35, pos=(0, 0)).draw()
+
+        # Draw buttons and text
+        if shock_trig["high"] == 1:
+            buttons_keylist = ["Next", "Stay"]
+        elif shock_trig["high"] == 10:
+            buttons_keylist = ["Previous", "Stay"]
+        else:
+            buttons_keylist = buttons["calibration"].keys()
+
+        for button_name in buttons_keylist:
+            buttons["calibration"][button_name].draw()
+            button_text["calibration"][button_name].draw()
+
+        win.flip()
+        
+        # Wait for a mouse click
+        trial_finish = False
+        mouse = event.Mouse()
+        mouse.clickReset()
+        
+        while trial_finish == False:
+            for button_name, button_rect in buttons["calibration"].items():
+                if mouse.isPressedIn(button_rect):
+                    if button_name == "Next":
+                        shock_trig["high"] += 1
+                        shock_trig["low"] += 1
+                        shock_trig["medium"] += 1
+                        trial_index += 1
+                        
+                    elif button_name == "Stay":
+                        calib_finish = True
+                        
+                    elif button_name == "Previous":
+                        shock_trig["high"] -= 1
+                        shock_trig["low"] -= 1
+                        shock_trig["medium"] -= 1
+                        trial_index -= 1
+                        previous_trial = True
     
-    # Wait for a mouse click
-    trial_finish = False
-    mouse = event.Mouse()
-    mouse.clickReset()
-    
-    while trial_finish == False:
-        for button_name, button_rect in buttons["calibration"].items():
-            if mouse.isPressedIn(button_rect):
-                if button_name == "Next":
-                    shock_trig["high"] = shock_trig["high"] + 1
-                    shock_trig["low"] = shock_trig["low"] + 1
-                    shock_trig["medium"] = shock_trig["medium"] + 1
                     trial_finish = True
-                    
-                elif button_name == "Stay":
-                    calib_finish = True
-                    trial_finish = True
-                    
-                elif button_name == "Previous":
-                    shock_trig["high"] = shock_trig["high"] - 1
-                    shock_trig["low"] = shock_trig["low"] - 1
-                    shock_trig["medium"] = shock_trig["medium"] + 1
-                    calib_finish = True
-                    trial_finish = True
-                    
-    win.flip()
-    
-    wait(iti)
+                    mouse.clickReset()                        
+        win.flip()
+        wait(iti)
 
 def show_trial(current_trial):
     if pport != None:
@@ -758,15 +824,12 @@ exp_finish = False
 # Run experiment
 while not exp_finish:
     termination_check()
-    # #display welcome and calibration instructions
+    #display welcome and calibration instructions
     instruction_trial(instructions_text["welcome"],3)
     instruction_trial(instructions_text["TENS_introduction"],3)
     instruction_trial(instructions_text["calibration"],8)
     
-    for trial in calib_trial_order:
-        show_calib_trial(trial)
-        if calib_finish == True:
-            break
+    show_calib_trial(calib_trial_order)
     
     instruction_trial(instructions_text["calibration_finish"],3)
     
