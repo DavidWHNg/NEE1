@@ -341,6 +341,7 @@ for phase, trials in num_trials_block.items():
                     "rft_schedule": rft_schedule_blocks[phase][block],
                     "outcome": trial_info["outcome"],
                     "choice_response": None,
+                    "choice_optimal": None,
                     "exp_response": None,
                     "pain_response": None
                 }
@@ -738,12 +739,14 @@ def show_trial(current_trial):
                     if button_name == TENS_outcomes["optimal"]:
                         current_trial["stimulus"] = "TENS"
                         current_trial["choice_response"] = TENS_outcomes["optimal"]
+                        current_trial["choice_optimal"] = "optimal"
                         current_trial["trialtype"] = TENS_outcomes["optimal"]
                         current_trial["outcome"] = "medium"
                         choice_finish = True
                     elif button_name == TENS_outcomes["suboptimal"]:
                         current_trial["stimulus"] = "TENS"
                         current_trial["choice_response"] = TENS_outcomes["suboptimal"]
+                        current_trial["choice_optimal"] = "suboptimal"
                         current_trial["trialtype"] = TENS_outcomes["suboptimal"]
                         current_trial["outcome"] = outcome_randomise(
                             "high",
