@@ -333,7 +333,7 @@ for phase, trials in num_trials_block.items():
             for num in range(trial_info["num"]):
                 trial = {
                     "phase": phase,
-                    "trialtype": trial_type,
+                    "trialtype": None,
                     "stimulus": trial_info["stimulus"],
                     "choice1": trial_info["choice1"],
                     "choice2": trial_info["choice2"],
@@ -537,13 +537,13 @@ buttons = {
                             pos=(-400, -300)),
     },
     "TENS": {
-        "left": visual.Rect(win,
+        TENS1_name: visual.Rect(win,
                     width=300,
                     height=80,
                     fillColor="black",
                     lineColor="white",
                     pos=(400, -300)),  
-        "right": visual.Rect(win,
+        TENS2_name: visual.Rect(win,
                     width=300,
                     height=80,
                     fillColor="black",
@@ -717,10 +717,8 @@ def show_trial(current_trial):
     #If TENS trial, ask for choice:
     
     if current_trial["choicetrial"] == True:
-        buttons["TENS"]["left"].draw()
-        buttons["TENS"]["right"].draw()
-        buttons_keylist = TENS_names
-        for button_name in buttons_keylist:
+        for button_name in TENS_names:
+            buttons["TENS"][button_name].draw()
             button_text["TENS"][button_name].draw()
         visual.TextStim(win,
                 text=response_instructions["Choice"],
@@ -740,11 +738,13 @@ def show_trial(current_trial):
                     if button_name == TENS_outcomes["optimal"]:
                         current_trial["stimulus"] = "TENS"
                         current_trial["choice_response"] = TENS_outcomes["optimal"]
+                        current_trial["trialtype"] = TENS_outcomes["optimal"]
                         current_trial["outcome"] = "medium"
                         choice_finish = True
                     elif button_name == TENS_outcomes["suboptimal"]:
                         current_trial["stimulus"] = "TENS"
                         current_trial["choice_response"] = TENS_outcomes["suboptimal"]
+                        current_trial["trialtype"] = TENS_outcomes["suboptimal"]
                         current_trial["outcome"] = outcome_randomise(
                             "high",
                             "low",
@@ -842,7 +842,7 @@ while not exp_finish:
     # instruction_trial(instructions_text["calibration_finish"],3)
     
     # #display main experiment phase
-    instruction_trial(instructions_text["experiment"],10)
+    # instruction_trial(instructions_text["experiment"],10)
     for trial in trial_order:
         show_trial(trial)
 
