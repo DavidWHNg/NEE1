@@ -177,6 +177,7 @@ def instruction_trial(instructions,holdtime):
 # Create functions
     # Save responses to a CSV file
 def save_data(data):
+    trial_order.extend(calib_trial_order)
     
     for trial in trial_order:
         trial['datetime'] = datetime
@@ -189,7 +190,6 @@ def save_data(data):
         trial["shock_level_high"] = shock_trig["high"]
 
 
-    trial_order.extend(calib_trial_order)
     # Extract column names from the keys in the first trial dictionary
     colnames = list(trial_order[0].keys())
 
