@@ -6,7 +6,7 @@ import random
 import csv
 import os
 
-ports_live = None # Set to None if parallel ports not plugged for coding/debugging other parts of exp
+ports_live = True # Set to None if parallel ports not plugged for coding/debugging other parts of exp
 
 ### Experiment details/parameters
 # misc parameters
@@ -22,6 +22,9 @@ TENS_pulse_pattern_list = {"pause": [(0.0, TENS_trig), (0.1, 0), # 3 rapid pulse
                                 (0.333, TENS_trig), (0.433, 0),
                                 (0.666, TENS_trig), (0.766, 0)] # constant equally spaced pulses 
 }
+TENS_image_size = (400,300)
+TENS_image_pos = (0,200)
+TENS_text_pos = (0,300)
 
 timer_precision_range = 0.01 # pulses should be accurate to within 10 milliseconds
 
@@ -46,6 +49,10 @@ while True:
         
         #set a path to a "data" folder to save data in
         data_folder = os.path.join(script_directory, "data")
+
+        #set stimuli folder path
+
+        stimulus_folder =  os.path.join(script_directory, "stimuli")
         
         # if data folder doesn"t exist, create one
         if not os.path.exists(data_folder):
@@ -77,18 +84,18 @@ while True:
     # get date and time of experiment start
 datetime = time.strftime("%Y-%m-%d_%H.%M.%S")
 
-TENS_outcomes = {"suboptimal": TENS_names[cb%2],
+TENS_trialtypes = {"suboptimal": TENS_names[cb%2],
                  "optimal" : TENS_names[(cb+1)%2]
 }
 
 if (cb // 2) % 2 == 0:
-    TENS1_name = TENS_outcomes["suboptimal"] #e.g. monopolar
-    TENS2_name = TENS_outcomes["optimal"] #e.g. bipolar
+    TENS1_name = TENS_trialtypes["suboptimal"] #e.g. monopolar
+    TENS2_name = TENS_trialtypes["optimal"] #e.g. bipolar
     TENS1_type = "suboptimal"
     TENS2_type = "optimal"
 else:
-    TENS1_name = TENS_outcomes["optimal"]
-    TENS2_name = TENS_outcomes["suboptimal"]
+    TENS1_name = TENS_trialtypes["optimal"]
+    TENS2_name = TENS_trialtypes["suboptimal"]
     TENS1_type = "optimal"
     TENS2_type = "suboptimal"
 
@@ -136,6 +143,39 @@ fix_stim = visual.TextStim(win,
                             height = 50,
                             font = "Roboto Mono Medium")
 
+#load in TENS graphics
+TENS_pulse_pattern_image_list = {"pause": visual.ImageStim(win,
+                                    image=os.path.join(stimulus_folder, "pause.png"),
+                                    size = TENS_image_size,
+                                    pos = TENS_image_pos
+                                    ),
+                            "constant": visual.ImageStim(win,
+                                    image=os.path.join(stimulus_folder, "constant.png"),
+                                    size = TENS_image_size,
+                                    pos = TENS_image_pos
+                            )
+}
+
+TENS_pulse_pattern_images = {TENS1_name: TENS_pulse_pattern_image_list[TENS_pulse_patterns_names[TENS1_type]],
+                             TENS2_name: TENS_pulse_pattern_image_list[TENS_pulse_patterns_names[TENS2_type]]
+    }
+
+TENS_pulse_pattern_text = {
+    "monopolar": visual.TextStim(win,
+                    text = "You are receiving monopolar TENS",
+                    height = 35,
+                    color = "white",
+                    pos = TENS_text_pos,
+                    wrapWidth= 960
+                    ),
+    "bipolar": visual.TextStim(win,
+                    text = "You are receiving bipolar TENS",
+                    height = 35,
+                    color = "white",
+                    pos = TENS_text_pos,
+                    wrapWidth= 960
+                    ),
+    }
 
 #define waiting function so experiment doesn't freeze as it does with core.wait()
 def wait(time):
@@ -185,7 +225,7 @@ def save_data(data):
         trial["group"] = group
         trial["group_name"] = group_name
         trial["cb"] = cb
-        trial["optimalTENS_name"] = TENS_outcomes["optimal"]
+        trial["optimalTENS_name"] = TENS_trialtypes["optimal"]
         trial["optimalTENS_pattern"] = TENS_pulse_patterns_names["optimal"]
         trial["shock_level_high"] = shock_trig["high"]
 
@@ -268,9 +308,10 @@ num_trials_block = {
                 "num":4,
                 "stimulus": "TENS",
                 "choicetrial": True,
-                "choice1": TENS_outcomes["optimal"],
-                "choice2": TENS_outcomes["suboptimal"],
+                "choice1": TENS_trialtypes["optimal"],
+                "choice2": TENS_trialtypes["suboptimal"],
                 "outcome": None,
+                "trialtype": None
             },
             "control": {
                 "num":1,
@@ -279,6 +320,7 @@ num_trials_block = {
                 "choice1": None,
                 "choice2": None,
                 "outcome": "low",
+                "trialtype": "control"
             }
         },
         "extinction": {
@@ -289,6 +331,7 @@ num_trials_block = {
                 "choice1": None,
                 "choice2": None,
                 "outcome": "low",
+                "trialtype": "monopolar"
             },
             "bipolar": {
                 "num":1,
@@ -297,6 +340,7 @@ num_trials_block = {
                 "choice1": None,
                 "choice2": None,
                 "outcome": "low",
+                "trialtype": "bipolar"
             },
             "control": {
                 "num":1,
@@ -305,6 +349,7 @@ num_trials_block = {
                 "choice1": None,
                 "choice2": None,
                 "outcome": "low",
+                "trialtype": "control"
             }
         }
 }
@@ -333,7 +378,7 @@ for phase, trials in num_trials_block.items():
             for num in range(trial_info["num"]):
                 trial = {
                     "phase": phase,
-                    "trialtype": None,
+                    "trialtype": trial_info["trialtype"],
                     "stimulus": trial_info["stimulus"],
                     "choice1": trial_info["choice1"],
                     "choice2": trial_info["choice2"],
@@ -736,18 +781,18 @@ def show_trial(current_trial):
             termination_check()
             for button_name, button_rect in buttons["TENS"].items():
                 if mouse.isPressedIn(button_rect):
-                    if button_name == TENS_outcomes["optimal"]:
+                    if button_name == TENS_trialtypes["optimal"]:
                         current_trial["stimulus"] = "TENS"
-                        current_trial["choice_response"] = TENS_outcomes["optimal"]
+                        current_trial["choice_response"] = TENS_trialtypes["optimal"]
                         current_trial["choice_optimal"] = "optimal"
-                        current_trial["trialtype"] = TENS_outcomes["optimal"]
+                        current_trial["trialtype"] = TENS_trialtypes["optimal"]
                         current_trial["outcome"] = "medium"
                         choice_finish = True
-                    elif button_name == TENS_outcomes["suboptimal"]:
+                    elif button_name == TENS_trialtypes["suboptimal"]:
                         current_trial["stimulus"] = "TENS"
-                        current_trial["choice_response"] = TENS_outcomes["suboptimal"]
+                        current_trial["choice_response"] = TENS_trialtypes["suboptimal"]
                         current_trial["choice_optimal"] = "suboptimal"
-                        current_trial["trialtype"] = TENS_outcomes["suboptimal"]
+                        current_trial["trialtype"] = TENS_trialtypes["suboptimal"]
                         current_trial["outcome"] = outcome_randomise(
                             "high",
                             "low",
@@ -767,21 +812,27 @@ def show_trial(current_trial):
         
     while countdown_timer.getTime() < 8 and countdown_timer.getTime() > 7: #turn on TENS at 8 seconds
         termination_check()
-        if pport != None and current_trial["choicetrial"] == True:
-            termination_check()
-            for time, port in TENS_pulse_patterns[current_trial["choice_response"]]:
-                if abs(countdown_timer.getTime() - math.floor(countdown_timer.getTime()) - time) < timer_precision_range:
-                    pport.setData(port)
+        if current_trial["stimulus"] == "TENS":
+            TENS_pulse_pattern_images[current_trial["trialtype"]].draw()
+            TENS_pulse_pattern_text[current_trial["trialtype"]].draw()
+            if pport != None:
+                for time, port in TENS_pulse_patterns[current_trial["trialtype"]]:
+                    termination_check()
+                    if abs(countdown_timer.getTime() - math.floor(countdown_timer.getTime()) - time) < timer_precision_range:
+                        pport.setData(port)
         countdown_text[str(int(math.ceil(countdown_timer.getTime())))].draw()
         win.flip()
 
     while countdown_timer.getTime() < 7 and countdown_timer.getTime() > 0: #ask for expectancy at 7 seconds
-        if pport != None and current_trial["choicetrial"] == True:
-            termination_check()
-            for time, port in TENS_pulse_patterns[current_trial["choice_response"]]:
-                if abs(countdown_timer.getTime() - math.floor(countdown_timer.getTime()) - time) < timer_precision_range:
-                    pport.setData(port)
-
+        termination_check()
+        if current_trial["stimulus"] == "TENS":
+            TENS_pulse_pattern_images[current_trial["trialtype"]].draw()
+            TENS_pulse_pattern_text[current_trial["trialtype"]].draw()
+            if pport != None:
+                for time, port in TENS_pulse_patterns[current_trial["trialtype"]]:
+                    termination_check()
+                    if abs(countdown_timer.getTime() - math.floor(countdown_timer.getTime()) - time) < timer_precision_range:
+                        pport.setData(port)
         countdown_text[str(int(math.ceil(countdown_timer.getTime())))].draw()
         
         # Ask for expectancy rating
@@ -835,18 +886,19 @@ exp_finish = False
 # Run experiment
 while not exp_finish:
     termination_check()
-    #display welcome and calibration instructions
-    # instruction_trial(instructions_text["welcome"],3)
-    # instruction_trial(instructions_text["TENS_introduction"],3)
-    # instruction_trial(instructions_text["calibration"],8)
+    # display welcome and calibration instructions
+    instruction_trial(instructions_text["welcome"],3)
+    instruction_trial(instructions_text["TENS_introduction"],3)
+    instruction_trial(instructions_text["calibration"],8)
     
-    # show_calib_trial(calib_trial_order)
+    show_calib_trial(calib_trial_order)
     
-    # instruction_trial(instructions_text["calibration_finish"],3)
+    instruction_trial(instructions_text["calibration_finish"],3)
     
-    # #display main experiment phase
-    # instruction_trial(instructions_text["experiment"],10)
+    #display main experiment phase
+    instruction_trial(instructions_text["experiment"],10)
     for trial in trial_order:
+    # for trial in [t for t in trial_order if t["phase"] == "extinction"]: #for testing extinction
         show_trial(trial)
 
     pport.setData(0) # Set all pins to 0 to shut off TENS, shock etc.    
